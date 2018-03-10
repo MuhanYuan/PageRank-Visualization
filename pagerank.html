@@ -1,0 +1,382 @@
+<html>
+<head>
+    <script type="text/javascript" src="visjs/dist/vis.js"></script>
+    <script type="text/javascript" src="canvasjs/canvasjs.min.js"></script>
+    <link href="visjs/dist/vis.css" rel="stylesheet" type="text/css" />
+    <link href="pagerank.css" rel="stylesheet" type="text/css" />
+    <!-- https://canvasjs.com/html5-javascript-line-chart/ -->
+    <style type="text/css">
+        #mynetwork {
+            width: 600px;
+            height: 400px;
+            border: 1px solid lightgray;
+        }
+        #node-popUp {
+          display:none;
+          position:fixed;
+          top: 50%;
+          left: 45%;
+          z-index:299;
+          width:250px;
+          height:120px;
+          background-color: #f9f9f9;
+          border-style:solid;
+          border-width:3px;
+          border-color: #5394ed;
+          padding:10px;
+          text-align: center;
+        }
+    </style>
+</head>
+<body>
+  <h1>PageRank Visualization</h1>
+<div class="intro">
+
+<p> PageRank is an algorithm used by Google Search to rank websites in their search engine results. It works by counting the number and quality of links to a page to determine a rough estimate of how important the website is. The underlying assumption is that more important websites are likely to receive more links from other websites <a href="https://en.wikipedia.org/wiki/PageRank">[1]</a>. In practice, PageRank works by counting the number and quality of links to a page to determine a rough estimate of how important the website is <a href="https://web.archive.org/web/20111104131332/https://www.google.com/competition/howgooglesearchworks.html">[2]</a>. PageRank assigns a score of importance to each page. Important
+pages are those with many in-links from important pages. But it sounds like a circular definition. How can we solve this problem?</p>
+
+<h3>PageRank Update Rule</h3>
+<p>Each node gives an equal share of d of its current PageRank to all the nodes it links to. d is the damping factor and a parameter of d between 0.8 and 0.9 is used in practice. The new PageRank of each node is the sum of all the PageRank it received from other nodes. As k gets larger, Scaled PageRank converges to a unique value, which depends on d. In this project, I am going to visualize this procedure and show students who are new to PageRank how these values gradually converge.</p>
+
+<h3>Guidelines</h3>
+
+<p>In the network graph, each node represents a webpage and its size is proportional to its PageRank.The edges between nodes indicate if user can jump from one page to another. The initial PageRank of each nodes is 1 and you can click "Update Once" button to update the PageRank using "Update Rule" mentioned before. You can also click "Run" button to keep the PageRank updating continuously and click "Stop" to cease.
+
+<p>As PageRank keeps changing, the size of each node is also changing. However, the if the you miss the animation for size change, you would still be able to tell if the node's PageRank increases/decreases from the color of the node. If the color of the node is close to red, it means its PageRank is going up; if the color of the node is close to blue, it means its PageRank is going down.</p>
+
+<p>When the PageRank is not updating, you can also edit the network by:</p>
+<p style="padding: 0px 50px">(a)Adding a new node to the network <br>
+(b)Deleting a node from the network<br>
+(c)Adding a new edge between two nodes<br>
+(d)Deleting an edge between two nodes<br>
+(e)Resetting the PageRank of selected node<br>
+(f)Resetting the damping parameter</p>
+
+
+<p>The line chart below will help track how each page's PageRank changes. When you hover cover the graph, the exact PageRank at corresponding time will show up.</p>
+
+<h4>Play around with the simulator.</h4>
+
+
+</div>
+
+<div id="mynetwork"></div>
+<div id="slidecontainer">
+  <input type="range" min="0" max="100" value="80" class="slider" id="myRange">
+  <h3>Damping Parameter: <span id="demo"></span></h3>
+</div>
+
+<div class="button-div" style="text-align:center">
+<button class="button" type="button" id="run-one" onclick="Runone ()">Update Once</button>
+<button class="button" type="button" id="run" onclick="Run ()">Run</button>
+<button class="button" type="button" id="run-stop" onclick="Stoprun ()">Stop</button>
+</div>
+
+<div id="chartContainer" style="height: 370px; width: 100%;"></div>
+<script type="text/javascript">
+    // create an array with nodes
+    var damping = 0.8
+    var slider = document.getElementById("myRange");
+    var output = document.getElementById("demo");
+      output.innerHTML = slider.value/100;
+      slider.oninput = function() {
+      output.innerHTML = this.value/100;
+      damping = this.value/100
+    }
+    var timer = 1
+    var nodes_data = [
+        {id: 1, label: 'Page A', value: 1, next_value:0, x: 0 , y: 0, color:'rgba(127,0,127,1)'},
+        {id: 2, label: 'Page B', value: 1, next_value:0, x: 10, y: 10, color:'rgba(127,0,127,1)'},
+        {id: 3, label: 'Page C', value: 1, next_value:0, x: 20, y: 20, color:'rgba(127,0,127,1)'},
+        {id: 4, label: 'Page D', value: 1, next_value:0, x: 30, y: 30, color:'rgba(127,0,127,1)'},
+        {id: 5, label: 'Page E', value: 1, next_value:0, x: 40, y: 40, color:'rgba(127,0,127,1)'},
+        {id: 6, label: 'Page F', value: 1, next_value:0, x: 50, y: 50, color:'rgba(127,0,127,1)'},
+        {id: 7, label: 'Page G', value: 1, next_value:0, x: 60, y: 60, color:'rgba(127,0,127,1)'},
+        {id: 8, label: 'Page H', value: 1, next_value:0, x: 70, y: 70, color:'rgba(127,0,127,1)'},
+        {id: 9, label: 'Page I', value: 1, next_value:0, x: 80, y: 80, color:'rgba(127,0,127,1)'},
+        {id: 10, label: 'Page J', value: 1, next_value:0, x: 90, y: 90, color:'rgba(127,0,127,1)'}
+    ]
+    var edges_data = [
+        {from: 1, to: 3},
+        {from: 1, to: 2},
+        {from: 2, to: 4},
+        {from: 2, to: 5},
+        {from: 4, to: 5},
+        {from: 5, to: 1},
+        {from: 6, to: 2},
+        {from: 7, to: 2},
+        {from: 1, to: 7},
+        {from: 9, to: 6},
+        {from: 1, to: 10},
+        {from: 8, to: 3},
+        {from: 10, to: 8},
+        {from: 3, to: 6},
+        {from: 4, to: 9},
+        {from: 9, to: 2},
+        {from: 5, to: 2},
+        {from: 7, to: 6},
+        {from: 8, to: 10}
+    ]
+    var nodes = new vis.DataSet(nodes_data);
+    var edges = new vis.DataSet(edges_data);
+    // create a network
+    var container = document.getElementById('mynetwork');
+    // provide the data in the vis format
+    var data = {
+        nodes: nodes,
+        edges: edges
+    };
+    var num_of_nodes = data["nodes"].length
+    var line_chart_data = []
+    function set_line_chart_data(){
+      for (node in data["nodes"]["_data"]){
+        temp_page_data = {type:"line",axisYType: "secondary",showInLegend: true,markerSize: 0, name:data["nodes"]["_data"][node].label}
+        temp_page_data.dataPoints = [{x:0,y:1}]
+        temp_page_data.num = parseInt(node)-1
+        line_chart_data.push(temp_page_data)
+      }
+    }
+    set_line_chart_data()
+    function new_line_chart_data(node_name, num){
+      temp_page_data = {type:"line",axisYType: "secondary",showInLegend: true,markerSize: 0, name:node_name}
+      temp_page_data.dataPoints = [{x:timer-1,y:1}]
+      temp_page_data.num = num
+      line_chart_data.push(temp_page_data)
+    }
+
+    function delete_line_chart_data(node_id){
+      for (node in line_chart_data){
+        if (line_chart_data[node].num == node_id){
+          line_chart_data.splice(parseInt(node)-1,1)
+          console.log("del")
+        }
+      }
+    }
+
+    function update_line_chart_data(node_id, new_val){
+      for (node in line_chart_data){
+        if (line_chart_data[node].num == node_id){
+          line_chart_data[node].dataPoints[line_chart_data[node].dataPoints.length -1] = {x: timer-1,y: new_val}
+        }
+      }
+    }
+
+    function toogleDataSeries(e){
+    	if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+    		e.dataSeries.visible = false;
+    	} else{
+    		e.dataSeries.visible = true;
+    	}
+    	chart.render();
+    }
+    function Runone(){
+      // console.log("t")
+      updatePR(damping,timer)
+      chart.render();
+      // console.log(data)
+      timer+=1
+      var network = new vis.Network(container, data, options);
+      network.setOptions(options)
+    }
+    function Run(){
+
+      myinterv = setInterval(Runone, 1000);
+      document.getElementById('run').style.display = "None";
+      document.getElementById('run-stop').style.display = "inline-block";
+    }
+    function Stoprun (){
+      clearInterval(myinterv)
+      document.getElementById('run').style.display = "inline-block";
+      document.getElementById('run-stop').style.display = "None";
+    }
+
+    function editNode(data, cancelAction, callback) {
+      document.getElementById('node-PR').value = data.value;
+      document.getElementById('node-saveButton').onclick = saveNodeData.bind(this, data, callback);
+      document.getElementById('node-cancelButton').onclick = cancelAction.bind(this, callback);
+      document.getElementById('node-popUp').style.display = 'block';
+      // console.log(data)
+    }
+    // Callback passed as parameter is ignored
+    function clearNodePopUp() {
+      document.getElementById('node-saveButton').onclick = null;
+      document.getElementById('node-cancelButton').onclick = null;
+      document.getElementById('node-popUp').style.display = 'none';
+    }
+
+    function cancelNodeEdit(callback) {
+      clearNodePopUp();
+      callback(null);
+    }
+
+    function saveNodeData(data, callback) {
+      data.value = parseFloat(document.getElementById('node-PR').value);
+      clearNodePopUp();
+      // console.log(data)
+      callback(data);
+      update_line_chart_data(data.id -1,data.value)
+      chart.render();
+    }
+
+    var options = {
+        autoResize: true,
+        height: '100%',
+        width: '100%',
+        locale: 'en',
+        manipulation: {
+          addNode: function(nodeData,callback) {
+            nodeData.label = "Node "+String.fromCharCode(65+ num_of_nodes);
+            num_of_nodes = num_of_nodes+1;
+            nodeData.id = num_of_nodes;
+            nodeData.value = 1;
+            nodeData.next_value = 0;
+            // console.log(nodeData.id)
+            callback(nodeData);
+            new_line_chart_data(nodeData.label, num_of_nodes)
+            chart.render();
+            // console.log(line_chart_data)
+          },
+          addEdge: function(edgeData,callback) {
+              callback(edgeData);
+          },
+          deleteNode: function(nodeData,callback){
+            delete_line_chart_data(nodeData["nodes"][0])
+            chart.render();
+            // console.log(nodeData["nodes"][0])
+            // console.log(line_chart_data)
+            callback(nodeData);
+          },
+          editNode: function (nodeData, callback) {
+            // filling in the popup DOM elements
+            document.getElementById('node-operation').innerHTML = "Edit Node";
+            editNode(nodeData, cancelNodeEdit, callback);
+            // console.log(line_chart_data)
+            // console.log(nodeData)
+
+
+          },
+        },
+        // locales: locales,
+        clickToUse: false,
+        // configure: {...},    // defined in the configure module.
+        edges: {
+          arrows: {
+            to:     {enabled: true, scaleFactor:0.5, type:'arrow'},
+            middle: {enabled: false, scaleFactor:1, type:'arrow'},
+            from:   {enabled: false, scaleFactor:1, type:'arrow'}
+        },
+          color:{
+            inherit:false
+          }
+        },
+        // groups: one,
+        // physics: false,
+        nodes: {
+          // size: 25,
+          scaling: {
+            label: {
+              min:8,
+              max:20
+            }
+          },
+          font:{
+            color:'rgb(255,255,255)'
+          },
+
+
+        },
+        // interaction: {...},  // defined in the interaction module.
+      }
+    // var network = new vis.Network(container, data, options);
+    // network.setOptions(options)
+
+    function updatePR(alpha, round_count){
+      console.log(data)
+      sum = 0
+      count = 0
+      for (i in data["nodes"]["_data"]){
+        sum = sum+ data["nodes"]["_data"][i].value
+        count = count+1
+      }
+      for (i in data["nodes"]["_data"]){
+        var out_link = [];
+        for (j in data["edges"]["_data"]){
+          if (data["edges"]["_data"][j].from == i){
+            out_link.push(data["edges"]["_data"][j].to)
+          }
+        }
+        // spread through link
+        if (out_link.length>0){
+          for (k in out_link){
+            data["nodes"]["_data"][out_link[k]].next_value = data["nodes"]["_data"][out_link[k]].next_value + data["nodes"]["_data"][i].value * alpha/out_link.length
+          }
+        }
+        else {
+          data["nodes"]["_data"][i].next_value += data["nodes"]["_data"][i].value * alpha
+        }
+        // spread randomly
+        data["nodes"]["_data"][i].next_value = data["nodes"]["_data"][i].next_value +  (1-alpha)*sum/count
+      }
+      // update pagerank value
+      for (i in data["nodes"]["_data"]){
+        data["nodes"]["_data"][i].color = "rgb("+ parseInt(127 + 80*(data["nodes"]["_data"][i].next_value-data["nodes"]["_data"][i].value)) + ",0," + parseInt(127- 80* (data["nodes"]["_data"][i].next_value-data["nodes"]["_data"][i].value))+")"
+        data["nodes"]["_data"][i].value = data["nodes"]["_data"][i].next_value
+        data["nodes"]["_data"][i].next_value = 0
+      }
+
+      for (node in data["nodes"]["_data"]){
+        // console.log(node)
+        for (node1 in line_chart_data){
+          if (node == line_chart_data[node1].num){
+            line_chart_data[node1].dataPoints.push({x:round_count,y:data["nodes"]["_data"][node].value})
+          }
+        }
+      }
+      // data = data
+      console.log(data)
+      console.log(line_chart_data)
+    }
+
+
+    // window.onload = function () {
+
+      var chart = new CanvasJS.Chart("chartContainer", {
+        	title: {
+        		text: "PageRank Track"
+        	},
+        	axisY2: {
+        		title: "PageRank Value",
+        	},
+        	toolTip: {
+        		shared: true
+        	},
+        	legend: {
+        		cursor: "pointer",
+        		verticalAlign: "top",
+        		horizontalAlign: "center",
+        		dockInsidePlotArea: true,
+        		itemclick: toogleDataSeries
+        	},
+        	data: line_chart_data
+        });
+    chart.render();
+
+    chart.render();
+    var network = new vis.Network(container, data, options);
+    network.setOptions(options)
+
+
+
+</script>
+<div id="node-popUp">
+  <span id="node-operation">node</span> <br>
+  <table style="margin:auto;">
+    <tr>
+      <td>PageRank</td><td><input id="node-PR" value="new value" /></td>
+    </tr>
+  </table>
+  <input type="button" value="save" id="node-saveButton" />
+  <input type="button" value="cancel" id="node-cancelButton" />
+</div>
+</body>
+</html>
